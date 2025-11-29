@@ -141,6 +141,38 @@ dart pub global activate coverage
 dart pub global run coverage:format_coverage --lcov --in=coverage --out=coverage/lcov.info --report-on=lib
 ```
 
+## 🚀 CI/CD com Jenkins
+
+Este projeto inclui configuração completa de Jenkins para integração e deploy contínuos.
+
+### Iniciar Jenkins
+
+```bash
+# Linux/Mac
+cd jenkins
+./setup.sh
+
+# Windows
+cd jenkins
+setup.bat
+```
+
+Acesse: http://localhost:8081
+- Usuário: `admin`
+- Senha: `admin123` (altere após primeiro login!)
+
+### Pipeline Automático
+
+O Jenkinsfile inclui:
+- ✅ Análise de código (`dart analyze`)
+- ✅ Testes automatizados (`dart test`)
+- ✅ Cobertura de código
+- ✅ Build de imagem Docker
+- ✅ Push para registry (branch main)
+- ✅ Deploy automático (branch main)
+
+Veja mais detalhes em [jenkins/README.md](jenkins/README.md)
+
 ## Exemplos com curl
 
 ```bash

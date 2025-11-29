@@ -14,3 +14,9 @@ pubspec.lock
 # OS
 .DS_Store
 Thumbs.db
+
+# Jenkins
+.jenkins.env
+jenkins_home/
+coverage/
+*.log

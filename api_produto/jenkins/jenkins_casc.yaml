@@ -1,0 +1,66 @@
+jenkins:
+  systemMessage: "Jenkins configurado automaticamente para projetos Dart"
+  numExecutors: 2
+  mode: NORMAL
+  scmCheckoutRetryCount: 3
+  
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "admin123"
+          
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+  remotingSecurity:
+    enabled: true
+
+  crumbIssuer:
+    standard:
+      excludeClientIPFromCrumb: false
+
+tool:
+  git:
+    installations:
+      - name: "Default"
+        home: "git"
+
+unclassified:
+  location:
+    url: "http://localhost:8081/"
+    adminAddress: "admin@localhost"
+    
+  globalLibraries:
+    libraries:
+      - name: "dart-pipeline"
+        retriever:
+          modernSCM:
+            scm:
+              git:
+                remote: "https://github.com/your-org/jenkins-dart-library.git"
+
+jobs:
+  - script: >
+      pipelineJob('api_produto_pipeline') {
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('https://github.com/your-org/api_produto.git')
+                }
+                branches('*/main')
+              }
+            }
+            scriptPath('Jenkinsfile')
+          }
+        }
+        triggers {
+          pollSCM {
+            scmpoll_spec('H/5 * * * *')
+          }
+        }
+      }

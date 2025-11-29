@@ -1,0 +1,386 @@
+// ============================================
+// EXEMPLOS DE JENKINSFILE PARA DIFERENTES CENÁRIOS
+// ============================================
+
+// ============================================
+// 1. PIPELINE SIMPLES (SEM DOCKER)
+// ============================================
+pipeline {
+    agent any
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Install') {
+            steps {
+                sh 'dart pub get'
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                sh 'dart test'
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh 'dart compile exe bin/server.dart -o bin/server'
+            }
+        }
+    }
+}
+
+// ============================================
+// 2. PIPELINE COM NOTIFICAÇÕES SLACK
+// ============================================
+pipeline {
+    agent any
+    
+    environment {
+        SLACK_CHANNEL = '#dev-notifications'
+    }
+    
+    stages {
+        stage('Build') {
+            steps {
+                sh 'dart pub get'
+                sh 'dart test'
+            }
+        }
+    }
+    
+    post {
+        success {
+            slackSend(
+                channel: env.SLACK_CHANNEL,
+                color: 'good',
+                message: "✅ Build #${env.BUILD_NUMBER} passou! - ${env.JOB_NAME}"
+            )
+        }
+        failure {
+            slackSend(
+                channel: env.SLACK_CHANNEL,
+                color: 'danger',
+                message: "❌ Build #${env.BUILD_NUMBER} falhou! - ${env.JOB_NAME}"
+            )
+        }
+    }
+}
+
+// ============================================
+// 3. PIPELINE COM DEPLOY EM MÚLTIPLOS AMBIENTES
+// ============================================
+pipeline {
+    agent any
+    
+    parameters {
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['dev', 'staging', 'production'],
+            description: 'Ambiente para deploy'
+        )
+    }
+    
+    stages {
+        stage('Build') {
+            steps {
+                sh 'dart pub get'
+                sh 'dart test'
+                sh 'docker build -t api_produto:${BUILD_NUMBER} .'
+            }
+        }
+        
+        stage('Deploy to Dev') {
+            when {
+                expression { params.ENVIRONMENT == 'dev' }
+            }
+            steps {
+                sh '''
+                    docker tag api_produto:${BUILD_NUMBER} api_produto:dev
+                    docker-compose -f docker-compose.dev.yml up -d
+                '''
+            }
+        }
+        
+        stage('Deploy to Staging') {
+            when {
+                expression { params.ENVIRONMENT == 'staging' }
+            }
+            steps {
+                input message: 'Deploy para staging?', ok: 'Deploy'
+                sh '''
+                    docker tag api_produto:${BUILD_NUMBER} api_produto:staging
+                    docker-compose -f docker-compose.staging.yml up -d
+                '''
+            }
+        }
+        
+        stage('Deploy to Production') {
+            when {
+                expression { params.ENVIRONMENT == 'production' }
+            }
+            steps {
+                input message: 'Deploy para PRODUÇÃO?', ok: 'Deploy'
+                sh '''
+                    docker tag api_produto:${BUILD_NUMBER} api_produto:production
+                    docker-compose -f docker-compose.prod.yml up -d
+                '''
+            }
+        }
+    }
+}
+
+// ============================================
+// 4. PIPELINE COM TESTES PARALELOS
+// ============================================
+pipeline {
+    agent any
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Install') {
+            steps {
+                sh 'dart pub get'
+            }
+        }
+        
+        stage('Parallel Tests') {
+            parallel {
+                stage('Unit Tests') {
+                    steps {
+                        sh 'dart test test/domain/ test/data/'
+                    }
+                }
+                stage('Integration Tests') {
+                    steps {
+                        sh 'dart test test/presentation/'
+                    }
+                }
+                stage('Code Analysis') {
+                    steps {
+                        sh 'dart analyze'
+                    }
+                }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh 'docker build -t api_produto .'
+            }
+        }
+    }
+}
+
+// ============================================
+// 5. PIPELINE COM KUBERNETES
+// ============================================
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_REGISTRY = 'docker.io/seu-usuario'
+        IMAGE_NAME = 'api_produto'
+        K8S_NAMESPACE = 'production'
+    }
+    
+    stages {
+        stage('Build') {
+            steps {
+                sh 'dart pub get'
+                sh 'dart test'
+            }
+        }
+        
+        stage('Docker Build & Push') {
+            steps {
+                script {
+                    docker.withRegistry('', 'docker-credentials') {
+                        def image = docker.build("${DOCKER_REGISTRY}/${IMAGE_NAME}:${BUILD_NUMBER}")
+                        image.push()
+                        image.push('latest')
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh """
+                    kubectl set image deployment/api-produto \
+                        api-produto=${DOCKER_REGISTRY}/${IMAGE_NAME}:${BUILD_NUMBER} \
+                        -n ${K8S_NAMESPACE}
+                    kubectl rollout status deployment/api-produto -n ${K8S_NAMESPACE}
+                """
+            }
+        }
+    }
+}
+
+// ============================================
+// 6. PIPELINE COM ANÁLISE DE SEGURANÇA
+// ============================================
+pipeline {
+    agent any
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Dependencies') {
+            steps {
+                sh 'dart pub get'
+            }
+        }
+        
+        stage('Security Scan') {
+            parallel {
+                stage('Dependency Check') {
+                    steps {
+                        sh 'dart pub outdated'
+                    }
+                }
+                stage('Docker Scan') {
+                    steps {
+                        sh 'docker build -t api_produto:scan .'
+                        sh 'trivy image api_produto:scan'
+                    }
+                }
+            }
+        }
+        
+        stage('Tests') {
+            steps {
+                sh 'dart test'
+            }
+        }
+        
+        stage('Deploy') {
+            when {
+                branch 'main'
+            }
+            steps {
+                sh 'docker-compose up -d'
+            }
+        }
+    }
+}
+
+// ============================================
+// 7. PIPELINE COM ROLLBACK AUTOMÁTICO
+// ============================================
+pipeline {
+    agent any
+    
+    environment {
+        PREVIOUS_VERSION = ''
+    }
+    
+    stages {
+        stage('Save Current Version') {
+            steps {
+                script {
+                    PREVIOUS_VERSION = sh(
+                        script: 'docker images api_produto:latest -q',
+                        returnStdout: true
+                    ).trim()
+                }
+            }
+        }
+        
+        stage('Build & Deploy') {
+            steps {
+                sh 'docker build -t api_produto:${BUILD_NUMBER} .'
+                sh 'docker tag api_produto:${BUILD_NUMBER} api_produto:latest'
+                sh 'docker-compose up -d'
+            }
+        }
+        
+        stage('Health Check') {
+            steps {
+                script {
+                    sleep 10
+                    def response = sh(
+                        script: 'curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/',
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (response != '200') {
+                        error "Health check falhou! Status: ${response}"
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        failure {
+            script {
+                if (PREVIOUS_VERSION) {
+                    echo "Fazendo rollback para versão anterior..."
+                    sh "docker tag ${PREVIOUS_VERSION} api_produto:latest"
+                    sh 'docker-compose up -d'
+                }
+            }
+        }
+    }
+}
+
+// ============================================
+// 8. PIPELINE COM MÉTRICAS E RELATÓRIOS
+// ============================================
+pipeline {
+    agent any
+    
+    stages {
+        stage('Build') {
+            steps {
+                sh 'dart pub get'
+            }
+        }
+        
+        stage('Tests & Coverage') {
+            steps {
+                sh 'dart test --coverage=coverage'
+                sh 'dart pub global activate coverage'
+                sh 'dart pub global run coverage:format_coverage --lcov --in=coverage --out=coverage/lcov.info --report-on=lib'
+            }
+        }
+        
+        stage('Code Quality') {
+            steps {
+                sh 'dart analyze --format=machine > analysis.txt || true'
+            }
+        }
+        
+        stage('Generate Reports') {
+            steps {
+                // Publicar relatório de cobertura
+                publishHTML([
+                    reportDir: 'coverage',
+                    reportFiles: 'index.html',
+                    reportName: 'Coverage Report'
+                ])
+                
+                // Publicar métricas
+                sh '''
+                    echo "Lines of Code: $(find lib -name '*.dart' | xargs wc -l | tail -1)"
+                    echo "Test Files: $(find test -name '*_test.dart' | wc -l)"
+                '''
+            }
+        }
+    }
+}

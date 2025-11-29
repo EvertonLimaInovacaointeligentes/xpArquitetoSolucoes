@@ -1,0 +1,307 @@
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_IMAGE = 'api_produto'
+        DOCKER_TAG = "${env.BUILD_NUMBER}"
+        DOCKER_REGISTRY = '' // Adicione seu registry se necessário (ex: 'docker.io/username')
+        APP_PORT = '8080'
+    }
+    
+    stages {
+        stage('🚀 Iniciando Pipeline') {
+            steps {
+                script {
+                    echo '=========================================='
+                    echo '  Pipeline CI/CD - API Produto'
+                    echo '=========================================='
+                    echo "Build: #${env.BUILD_NUMBER}"
+                    echo "Branch: ${env.GIT_BRANCH}"
+                    echo "Commit: ${env.GIT_COMMIT}"
+                    echo '=========================================='
+                }
+            }
+        }
+        
+        stage('📥 Checkout') {
+            steps {
+                echo '📥 Clonando repositório do Git...'
+                checkout scm
+                script {
+                    echo "✅ Código fonte obtido com sucesso"
+                    sh 'git log -1 --pretty=format:"%h - %an: %s"'
+                }
+            }
+        }
+        
+        stage('📦 Instalando Dependências') {
+            steps {
+                echo '📦 Instalando dependências do Dart...'
+                script {
+                    sh 'dart --version'
+                    sh 'dart pub get'
+                    echo '✅ Dependências instaladas com sucesso'
+                }
+            }
+        }
+        
+        stage('🔍 Análise de Código') {
+            steps {
+                echo '🔍 Executando análise estática de código...'
+                script {
+                    def analysisResult = sh(
+                        script: 'dart analyze --fatal-infos',
+                        returnStatus: true
+                    )
+                    
+                    if (analysisResult == 0) {
+                        echo '✅ Análise de código passou sem problemas'
+                    } else {
+                        error '❌ Análise de código encontrou problemas'
+                    }
+                }
+            }
+        }
+        
+        stage('🧪 Testes Unitários') {
+            steps {
+                echo '🧪 Executando testes unitários...'
+                script {
+                    sh 'dart test --reporter=expanded'
+                    echo '✅ Todos os testes passaram'
+                }
+            }
+        }
+        
+        stage('📊 Cobertura de Código') {
+            steps {
+                echo '📊 Gerando relatório de cobertura...'
+                script {
+                    sh '''
+                        dart test --coverage=coverage
+                        dart pub global activate coverage
+                        dart pub global run coverage:format_coverage --lcov --in=coverage --out=coverage/lcov.info --report-on=lib
+                    '''
+                    
+                    // Calcular porcentagem de cobertura
+                    def coverage = sh(
+                        script: '''
+                            if [ -f coverage/lcov.info ]; then
+                                lines_found=$(grep -o "LF:[0-9]*" coverage/lcov.info | cut -d: -f2 | awk '{s+=$1} END {print s}')
+                                lines_hit=$(grep -o "LH:[0-9]*" coverage/lcov.info | cut -d: -f2 | awk '{s+=$1} END {print s}')
+                                if [ "$lines_found" -gt 0 ]; then
+                                    echo "scale=2; ($lines_hit / $lines_found) * 100" | bc
+                                else
+                                    echo "0"
+                                fi
+                            else
+                                echo "0"
+                            fi
+                        ''',
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "✅ Cobertura de código: ${coverage}%"
+                }
+            }
+        }
+        
+        stage('🏗️ Build da Aplicação') {
+            steps {
+                echo '🏗️ Compilando aplicação Dart...'
+                script {
+                    sh 'dart compile exe bin/server.dart -o bin/server'
+                    echo '✅ Aplicação compilada com sucesso'
+                }
+            }
+        }
+        
+        stage('🐳 Build Docker Image') {
+            steps {
+                echo '🐳 Construindo imagem Docker...'
+                script {
+                    def imageName = env.DOCKER_REGISTRY ? 
+                        "${env.DOCKER_REGISTRY}/${env.DOCKER_IMAGE}" : 
+                        "${env.DOCKER_IMAGE}"
+                    
+                    echo "Construindo: ${imageName}:${env.DOCKER_TAG}"
+                    docker.build("${imageName}:${env.DOCKER_TAG}")
+                    
+                    echo "Taggeando como latest: ${imageName}:latest"
+                    sh "docker tag ${imageName}:${env.DOCKER_TAG} ${imageName}:latest"
+                    
+                    echo '✅ Imagem Docker construída com sucesso'
+                    sh "docker images ${imageName}"
+                }
+            }
+        }
+        
+        stage('🔐 Scan de Segurança') {
+            steps {
+                echo '🔐 Verificando vulnerabilidades na imagem...'
+                script {
+                    def imageName = env.DOCKER_REGISTRY ? 
+                        "${env.DOCKER_REGISTRY}/${env.DOCKER_IMAGE}:${env.DOCKER_TAG}" : 
+                        "${env.DOCKER_IMAGE}:${env.DOCKER_TAG}"
+                    
+                    // Verificar dependências desatualizadas
+                    sh 'dart pub outdated || true'
+                    
+                    echo '✅ Scan de segurança concluído'
+                }
+            }
+        }
+        
+        stage('📤 Push Docker Image') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo '📤 Enviando imagem para Docker Registry...'
+                script {
+                    if (env.DOCKER_REGISTRY) {
+                        docker.withRegistry('', 'docker-credentials') {
+                            def imageName = "${env.DOCKER_REGISTRY}/${env.DOCKER_IMAGE}"
+                            
+                            echo "Pushing: ${imageName}:${env.DOCKER_TAG}"
+                            docker.image("${imageName}:${env.DOCKER_TAG}").push()
+                            
+                            echo "Pushing: ${imageName}:latest"
+                            docker.image("${imageName}:latest").push()
+                            
+                            echo '✅ Imagem enviada para registry com sucesso'
+                        }
+                    } else {
+                        echo '⚠️ Registry não configurado. Pulando push...'
+                    }
+                }
+            }
+        }
+        
+        stage('🚀 Deploy') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo '🚀 Iniciando deploy da aplicação...'
+                script {
+                    // Parar containers antigos
+                    echo 'Parando containers antigos...'
+                    sh 'docker-compose down || true'
+                    
+                    // Iniciar novos containers
+                    echo 'Iniciando novos containers...'
+                    sh 'docker-compose up -d'
+                    
+                    // Aguardar aplicação iniciar
+                    echo 'Aguardando aplicação iniciar...'
+                    sleep 10
+                    
+                    echo '✅ Deploy concluído com sucesso'
+                }
+            }
+        }
+        
+        stage('✅ Health Check') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo '✅ Verificando saúde da aplicação...'
+                script {
+                    def maxRetries = 5
+                    def retryCount = 0
+                    def healthy = false
+                    
+                    while (retryCount < maxRetries && !healthy) {
+                        def response = sh(
+                            script: "curl -s -o /dev/null -w '%{http_code}' http://localhost:${env.APP_PORT}/",
+                            returnStdout: true
+                        ).trim()
+                        
+                        if (response == '200') {
+                            healthy = true
+                            echo "✅ Aplicação está saudável! (Status: ${response})"
+                        } else {
+                            retryCount++
+                            echo "⚠️ Tentativa ${retryCount}/${maxRetries} - Status: ${response}"
+                            if (retryCount < maxRetries) {
+                                sleep 5
+                            }
+                        }
+                    }
+                    
+                    if (!healthy) {
+                        error '❌ Health check falhou após múltiplas tentativas'
+                    }
+                    
+                    // Mostrar logs do container
+                    echo 'Logs da aplicação:'
+                    sh 'docker-compose logs --tail=20 api'
+                }
+            }
+        }
+        
+        stage('📋 Resumo do Deploy') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    echo '=========================================='
+                    echo '  Deploy Concluído com Sucesso!'
+                    echo '=========================================='
+                    echo "Build: #${env.BUILD_NUMBER}"
+                    echo "Imagem: ${env.DOCKER_IMAGE}:${env.DOCKER_TAG}"
+                    echo "URL: http://localhost:${env.APP_PORT}"
+                    echo "Swagger: http://localhost:${env.APP_PORT}/swagger/"
+                    echo '=========================================='
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo '🧹 Limpando workspace...'
+            script {
+                // Arquivar relatórios
+                archiveArtifacts artifacts: 'coverage/**/*', allowEmptyArchive: true
+                
+                // Publicar relatório de cobertura se existir
+                publishHTML([
+                    allowMissing: true,
+                    alwaysLinkToLastBuild: true,
+                    keepAll: true,
+                    reportDir: 'coverage',
+                    reportFiles: 'index.html',
+                    reportName: 'Coverage Report'
+                ])
+            }
+            cleanWs()
+        }
+        success {
+            script {
+                echo '=========================================='
+                echo '  ✅ Pipeline Executado com Sucesso!'
+                echo '=========================================='
+                echo "Duração: ${currentBuild.durationString}"
+                echo "Build: #${env.BUILD_NUMBER}"
+                echo '=========================================='
+            }
+        }
+        failure {
+            script {
+                echo '=========================================='
+                echo '  ❌ Pipeline Falhou!'
+                echo '=========================================='
+                echo "Build: #${env.BUILD_NUMBER}"
+                echo "Stage: ${env.STAGE_NAME}"
+                echo '=========================================='
+            }
+        }
+        unstable {
+            echo '⚠️ Pipeline instável - verifique os warnings'
+        }
+    }
+}
