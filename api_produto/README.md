@@ -219,6 +219,49 @@ make k8s-delete
 
 Veja documentação completa em [k8s/README.md](k8s/README.md)
 
+## 🏗️ Terraform (Infraestrutura como Código)
+
+Provisione e gerencie toda a infraestrutura Kubernetes usando Terraform.
+
+### Deploy com Terraform
+
+```bash
+# Inicializar
+make tf-init
+
+# Planejar
+make tf-plan-dev
+
+# Aplicar
+make tf-apply-dev
+```
+
+### Recursos Gerenciados
+
+- ✅ Namespace
+- ✅ Deployment (3 réplicas)
+- ✅ Service (LoadBalancer)
+- ✅ ConfigMap e Secrets
+- ✅ HPA (Auto-scaling)
+- ✅ Ingress (SSL/TLS)
+- ✅ Network Policy
+- ✅ Pod Disruption Budget
+
+### Ambientes
+
+```bash
+# Desenvolvimento (1 réplica, recursos mínimos)
+make tf-apply-dev
+
+# Staging (2 réplicas, HPA 2-5)
+make tf-apply-staging
+
+# Produção (3 réplicas, HPA 2-10)
+make tf-apply-prod
+```
+
+Veja documentação completa em [terraform/README.md](terraform/README.md)
+
 ## Exemplos com curl
 
 ```bash

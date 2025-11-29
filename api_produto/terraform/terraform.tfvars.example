@@ -1,0 +1,43 @@
+# Kubernetes Configuration
+kubeconfig_path = "~/.kube/config"
+namespace       = "api-produto"
+environment     = "production"
+
+# Docker Configuration
+docker_image = "api_produto"
+docker_tag   = "latest"
+
+# Application Configuration
+app_port    = 8080
+api_version = "v1"
+log_level   = "info"
+
+# Deployment Configuration
+replicas = 3
+
+# Resources
+resources_requests_cpu    = "100m"
+resources_requests_memory = "128Mi"
+resources_limits_cpu      = "500m"
+resources_limits_memory   = "512Mi"
+
+# Service Configuration
+service_type = "LoadBalancer"
+
+# HPA Configuration
+enable_hpa         = true
+hpa_min_replicas   = 2
+hpa_max_replicas   = 10
+hpa_cpu_target     = 70
+hpa_memory_target  = 80
+
+# Ingress Configuration
+enable_ingress = true
+ingress_host   = "api-produto.example.com"
+
+# Network Policy
+enable_network_policy = true
+
+# Secrets (use environment variables or secret management)
+# database_url = "postgresql://user:password@localhost:5432/api_produto"
+# api_key      = "your-secret-api-key"

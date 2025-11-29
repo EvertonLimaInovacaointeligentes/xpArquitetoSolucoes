@@ -60,3 +60,31 @@ k8s-delete: ## Deletar recursos do Kubernetes
 
 k8s-port-forward: ## Port forward para teste local
 	kubectl port-forward svc/api-produto-service 8080:80 -n api-produto
+
+# Terraform
+tf-init: ## Inicializar Terraform
+	cd terraform && terraform init
+
+tf-plan-dev: ## Planejar deploy Terraform (dev)
+	cd terraform && terraform plan -var-file=environments/dev.tfvars
+
+tf-plan-staging: ## Planejar deploy Terraform (staging)
+	cd terraform && terraform plan -var-file=environments/staging.tfvars
+
+tf-plan-prod: ## Planejar deploy Terraform (production)
+	cd terraform && terraform plan -var-file=environments/production.tfvars
+
+tf-apply-dev: ## Aplicar Terraform (dev)
+	cd terraform && terraform apply -var-file=environments/dev.tfvars
+
+tf-apply-staging: ## Aplicar Terraform (staging)
+	cd terraform && terraform apply -var-file=environments/staging.tfvars
+
+tf-apply-prod: ## Aplicar Terraform (production)
+	cd terraform && terraform apply -var-file=environments/production.tfvars
+
+tf-destroy-dev: ## Destruir recursos Terraform (dev)
+	cd terraform && terraform destroy -var-file=environments/dev.tfvars
+
+tf-output: ## Ver outputs do Terraform
+	cd terraform && terraform output
