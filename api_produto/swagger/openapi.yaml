@@ -1,0 +1,226 @@
+openapi: 3.0.0
+info:
+  title: API de Produtos
+  description: API REST para gerenciamento de produtos com operações CRUD
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:8080
+    description: Servidor de desenvolvimento
+
+tags:
+  - name: Produtos
+    description: Operações relacionadas a produtos
+
+paths:
+  /products:
+    get:
+      tags:
+        - Produtos
+      summary: Listar todos os produtos
+      description: Retorna uma lista com todos os produtos cadastrados
+      responses:
+        '200':
+          description: Lista de produtos retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+              example:
+                - id: "1"
+                  name: "Notebook"
+                  price: 2500.00
+                  quantity: 10
+                - id: "2"
+                  name: "Mouse"
+                  price: 50.00
+                  quantity: 20
+
+    post:
+      tags:
+        - Produtos
+      summary: Criar novo produto
+      description: Cria um novo produto no sistema
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductInput'
+            example:
+              name: "Teclado Mecânico"
+              price: 350.00
+              quantity: 15
+      responses:
+        '201':
+          description: Produto criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /products/{id}:
+    get:
+      tags:
+        - Produtos
+      summary: Buscar produto por ID
+      description: Retorna um produto específico pelo seu ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID do produto
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Produto encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Produto não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags:
+        - Produtos
+      summary: Atualizar produto
+      description: Atualiza os dados de um produto existente
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID do produto
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductInput'
+            example:
+              name: "Notebook Dell"
+              price: 2800.00
+              quantity: 8
+      responses:
+        '200':
+          description: Produto atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Produto não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags:
+        - Produtos
+      summary: Deletar produto
+      description: Remove um produto do sistema
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID do produto
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Produto deletado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Produto deletado com sucesso"
+        '404':
+          description: Produto não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          description: ID único do produto
+          example: "1"
+        name:
+          type: string
+          description: Nome do produto
+          example: "Notebook"
+        price:
+          type: number
+          format: double
+          description: Preço do produto
+          example: 2500.00
+        quantity:
+          type: integer
+          description: Quantidade em estoque
+          example: 10
+      required:
+        - id
+        - name
+        - price
+        - quantity
+
+    ProductInput:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Nome do produto
+          example: "Mouse Gamer"
+        price:
+          type: number
+          format: double
+          description: Preço do produto
+          example: 150.00
+        quantity:
+          type: integer
+          description: Quantidade em estoque
+          example: 20
+      required:
+        - name
+        - price
+        - quantity
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Mensagem de erro
+          example: "Produto não encontrado"
