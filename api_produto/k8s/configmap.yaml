@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-produto-config
+  namespace: api-produto
+data:
+  PORT: "8080"
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "info"
+  API_VERSION: "v1"
+  # Adicione outras configurações aqui

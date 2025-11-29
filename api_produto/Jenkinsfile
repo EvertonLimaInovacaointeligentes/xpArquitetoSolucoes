@@ -6,6 +6,7 @@ pipeline {
         DOCKER_TAG = "${env.BUILD_NUMBER}"
         DOCKER_REGISTRY = '' // Adicione seu registry se necessário (ex: 'docker.io/username')
         APP_PORT = '8080'
+        DEPLOY_TO_K8S = 'false' // Altere para 'true' para habilitar deploy no Kubernetes
     }
     
     stages {
@@ -242,6 +243,76 @@ pipeline {
             }
         }
         
+        stage('☸️ Deploy to Kubernetes') {
+            when {
+                allOf {
+                    branch 'main'
+                    environment name: 'DEPLOY_TO_K8S', value: 'true'
+                }
+            }
+            steps {
+                echo '☸️ Iniciando deploy no Kubernetes...'
+                script {
+                    // Verificar se kubectl está disponível
+                    def kubectlAvailable = sh(
+                        script: 'command -v kubectl',
+                        returnStatus: true
+                    ) == 0
+                    
+                    if (!kubectlAvailable) {
+                        echo '⚠️ kubectl não encontrado. Pulando deploy K8s...'
+                        return
+                    }
+                    
+                    // Verificar conexão com cluster
+                    def clusterConnected = sh(
+                        script: 'kubectl cluster-info',
+                        returnStatus: true
+                    ) == 0
+                    
+                    if (!clusterConnected) {
+                        echo '⚠️ Não conectado ao cluster K8s. Pulando deploy...'
+                        return
+                    }
+                    
+                    echo 'Atualizando deployment no Kubernetes...'
+                    
+                    // Atualizar imagem no deployment
+                    def imageName = env.DOCKER_REGISTRY ? 
+                        "${env.DOCKER_REGISTRY}/${env.DOCKER_IMAGE}:${env.DOCKER_TAG}" : 
+                        "${env.DOCKER_IMAGE}:${env.DOCKER_TAG}"
+                    
+                    sh """
+                        kubectl set image deployment/api-produto \
+                            api-produto=${imageName} \
+                            -n api-produto
+                    """
+                    
+                    // Aguardar rollout
+                    echo 'Aguardando rollout do deployment...'
+                    sh 'kubectl rollout status deployment/api-produto -n api-produto --timeout=5m'
+                    
+                    // Verificar pods
+                    echo 'Verificando pods:'
+                    sh 'kubectl get pods -n api-produto -l app=api-produto'
+                    
+                    // Obter URL do serviço
+                    def externalIP = sh(
+                        script: 'kubectl get svc api-produto-service -n api-produto -o jsonpath=\'{.status.loadBalancer.ingress[0].ip}\' 2>/dev/null || echo "pending"',
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (externalIP && externalIP != 'pending') {
+                        echo "✅ Deploy K8s concluído!"
+                        echo "URL: http://${externalIP}"
+                        echo "Swagger: http://${externalIP}/swagger/"
+                    } else {
+                        echo '✅ Deploy K8s concluído! (IP externo pendente)'
+                    }
+                }
+            }
+        }
+        
         stage('📋 Resumo do Deploy') {
             when {
                 branch 'main'
@@ -253,8 +324,15 @@ pipeline {
                     echo '=========================================='
                     echo "Build: #${env.BUILD_NUMBER}"
                     echo "Imagem: ${env.DOCKER_IMAGE}:${env.DOCKER_TAG}"
-                    echo "URL: http://localhost:${env.APP_PORT}"
-                    echo "Swagger: http://localhost:${env.APP_PORT}/swagger/"
+                    
+                    if (env.DEPLOY_TO_K8S == 'true') {
+                        echo "Plataforma: Kubernetes"
+                        echo "Namespace: api-produto"
+                    } else {
+                        echo "Plataforma: Docker Compose"
+                        echo "URL: http://localhost:${env.APP_PORT}"
+                        echo "Swagger: http://localhost:${env.APP_PORT}/swagger/"
+                    }
                     echo '=========================================='
                 }
             }

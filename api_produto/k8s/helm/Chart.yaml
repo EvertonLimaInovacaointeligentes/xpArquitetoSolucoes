@@ -1,0 +1,14 @@
+apiVersion: v2
+name: api-produto
+description: API REST CRUD de produtos em Dart
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - api
+  - dart
+  - rest
+  - crud
+maintainers:
+  - name: DevOps Team
+    email: devops@example.com

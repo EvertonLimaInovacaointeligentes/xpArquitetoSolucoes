@@ -154,7 +154,7 @@ cd jenkins
 
 # Windows
 cd jenkins
-setup.bat
+.\setup.bat
 ```
 
 Acesse: http://localhost:8081
@@ -169,9 +169,55 @@ O Jenkinsfile inclui:
 - ✅ Cobertura de código
 - ✅ Build de imagem Docker
 - ✅ Push para registry (branch main)
-- ✅ Deploy automático (branch main)
+- ✅ Deploy automático (Docker Compose ou Kubernetes)
 
 Veja mais detalhes em [jenkins/README.md](jenkins/README.md)
+
+## ☸️ Kubernetes
+
+Deploy e gerenciamento com Kubernetes para alta disponibilidade e escalabilidade.
+
+### Deploy Rápido
+
+```bash
+# Desenvolvimento
+make k8s-deploy-dev
+
+# Staging
+make k8s-deploy-staging
+
+# Produção
+make k8s-deploy-prod
+```
+
+### Recursos Kubernetes
+
+- **Deployment**: 3 réplicas com rolling updates
+- **Service**: LoadBalancer para acesso externo
+- **HPA**: Auto-scaling (2-10 pods) baseado em CPU/memória
+- **Ingress**: Roteamento HTTP/HTTPS com SSL
+- **ConfigMap**: Configurações por ambiente
+- **Secrets**: Dados sensíveis criptografados
+- **Network Policy**: Isolamento de rede
+- **PDB**: Garantia de disponibilidade
+
+### Comandos Úteis
+
+```bash
+# Ver status
+make k8s-status
+
+# Ver logs
+make k8s-logs
+
+# Port forward para teste local
+make k8s-port-forward
+
+# Deletar recursos
+make k8s-delete
+```
+
+Veja documentação completa em [k8s/README.md](k8s/README.md)
 
 ## Exemplos com curl
 
